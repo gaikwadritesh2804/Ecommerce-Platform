@@ -1,16 +1,18 @@
-
-target/
-**/target/
-*.class
-*.jar
-*.war
-.idea/
-.vscode/
-*.iml
+# Environment variables
 .env
 .env.*
 !.env.example
-.DS_Store
-*.tar
-node_modules/
-dist/
+
+# Java build files
+**/target/
+
+# Node dependencies and build output
+**/node_modules/
+frontend/dist/
+
+# IDE files
+.idea/
+.vscode/
+
+# Logs
+*.log
