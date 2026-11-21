@@ -1,0 +1,172 @@
+services:
+  
+#user-service
+
+  user-service:
+    build:
+      context: .
+      dockerfile: docker/springboot.Dockerfile
+      args:
+       SERVICE_DIR: services/user-service
+       SERVICE_PORT: 8081
+
+    image: ecommerce-user-service:1.0
+    container_name: ecommerce-user-service
+    ports:
+      - "8081:8081"
+    networks:
+      - ecommerce-network       
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ecommerce-postgres:5432/users_db
+      - SPRING_DATASOURCE_USERNAME=appuser
+      - SPRING_DATASOURCE_PASSWORD=localdev
+
+    mem_limit: 512m
+    cpus: 0.5
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8081/actuator/health | grep -q UP"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+    restart: unless-stopped
+
+#product-service
+
+  product-service:
+    build:
+      context: .
+      dockerfile: docker/springboot.Dockerfile
+      args:
+        SERVICE_DIR: services/product-service
+        SERVICE_PORT: 8082
+
+    image: ecommerce-product-service:1.0
+    container_name: ecommerce-product-service
+    ports:
+      - "8082:8082"
+    networks:
+      - ecommerce-network
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ecommerce-postgres:5432/products_db
+      - SPRING_DATASOURCE_USERNAME=appuser
+      - SPRING_DATASOURCE_PASSWORD=localdev
+
+    mem_limit: 512m
+    cpus: 0.5 
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8082/actuator/health | grep -q UP"]
+      interval: 30s
+      timeout: 10s
+      retries: 5 
+
+    restart: unless-stopped
+
+#order-service
+
+  order-service:
+    build:
+      context: .
+      dockerfile: docker/springboot.Dockerfile
+      args:
+        SERVICE_DIR: services/order-service
+        SERVICE_PORT: 8083
+
+    image: ecommerce-order-service:1.0
+    container_name: ecommerce-order-service
+    ports:
+      - "8083:8083"
+    networks:
+      - ecommerce-network
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ecommerce-postgres:5432/orders_db
+      - SPRING_DATASOURCE_USERNAME=appuser
+      - SPRING_DATASOURCE_PASSWORD=localdev
+
+    mem_limit: 512m
+    cpus: 0.5
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8083/actuator/health | grep -q UP"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+    restart: unless-stopped         
+
+#payment-service
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: docker/springboot.Dockerfile
+      args:
+        SERVICE_DIR: services/payment-service
+        SERVICE_PORT: 8084
+
+    image: ecommerce-payment-service:1.0
+    container_name: ecommerce-payment-service
+    ports:
+      - "8084:8084"
+    networks:
+      - ecommerce-network
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ecommerce-postgres:5432/payments_db
+      - SPRING_DATASOURCE_USERNAME=appuser
+      - SPRING_DATASOURCE_PASSWORD=localdev
+    mem_limit: 512m
+    cpus: 0.5
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8084/actuator/health | grep -q UP"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+    restart: unless-stopped
+
+#frontend-service
+
+  frontend-service:
+    build:
+      context: /frontend
+      dockerfile: Dockerfile
+      
+    image: ecommerce-frontend:1.0
+    container_name: ecommerce-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - ecommerce-network
+
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - payment-service 
+
+    mem_limit: 512m
+    cpus: 0.5
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+    restart: unless-stopped
+
+
+
+networks:
+  ecommerce-network:
+    external: true
+    
+
+
+
+
+

@@ -1,0 +1,14 @@
+cat > .gitignore <<'EOF'
+target/
+**/target/
+*.class
+*.jar
+*.war
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+.DS_Store
+EOF
