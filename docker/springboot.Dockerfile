@@ -21,7 +21,8 @@ RUN mvn -f ${SERVICE_DIR}/pom.xml clean package -DskipTests
 
 
 # Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21.0.13.1_2-jre-alpine-3.24
+RUN apk update && apk upgrade --no-cache zlib
 
 ARG SERVICE_DIR
 ARG SERVICE_PORT
