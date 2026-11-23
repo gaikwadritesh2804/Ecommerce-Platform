@@ -24,7 +24,7 @@ variables:
     value: $(Build.BuildId)
 
   - name: acrServiceConnection
-    value: acr-service-connection
+    value: aacr-service-connection-new
 
 stages:
   - stage: Build_Scan_Push
