@@ -165,7 +165,7 @@ stages:
                 do
                   sed -i \
                     "s|newTag:.*|newTag: \"$(imageTag)\"|" \
-                    "apps/ecommerce/overlays/${environment}/kustomization.yaml"
+                    "apps/ecommerce/overlays/${environment}/kustomization.yml"
                 done
               done
 
