@@ -35,18 +35,36 @@ stages:
         steps:
           - checkout: self
 
+          - task: SonarCloudPrepare@4
+            displayName: 'Prepare SonarQube Analysis'
+            inputs:
+             SonarCloud: 'sonarcloud-connection'
+             organization: 'gaikwadritesh2804'
+             scannerMode: 'other'
+             extraProperties: |
+              sonar.projectKey=Ecommerce-Platform
+              sonar.projectName=Ecommerce-Platform
+              sonar.maven.scanAll=true
+
+
           # Build and test all four Spring Boot modules
           - template: templates/build/maven-build.yml@templates
             parameters:
               mavenPomFile: pom.xml
               goals: clean verify
+              sonarQubeRunAnalysis: true
+
+          - task: SonarCloudPublish@4
+            displayName: 'Publish SonarQube Quality Gate'
+            inputs:
+              pollingTimeoutSec: '300'    
 
           # Build and lint React frontend
           - template: templates/build/node-build.yml@templates
             parameters:
               workingDirectory: frontend
               nodeVersion: '22.x'
-              buildCommand: npm run build
+              buildCommand: npm run build  
 
           # Login to Azure Container Registry
           - task: Docker@2
