@@ -15,9 +15,16 @@ resources:
       endpoint: github-connection
 
 variables:
-  acrLoginServer: ecommerceacr2804.azurecr.io
-  imageTag: $(Build.BuildId)
-  acrServiceConnection: acr-service-connection
+  - group: ecommerce-secrets
+
+  - name: acrLoginServer
+    value: ecommerceacr2804.azurecr.io
+
+  - name: imageTag
+    value: $(Build.BuildId)
+
+  - name: acrServiceConnection
+    value: acr-service-connection
 
 stages:
   - stage: Build_Scan_Push
