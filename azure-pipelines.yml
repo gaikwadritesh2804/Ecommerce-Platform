@@ -1,0 +1,175 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+resources:
+  repositories:
+    - repository: templates
+      type: github
+      name: gaikwadritesh2804/azure-devops-templates
+      ref: refs/heads/main
+      endpoint: github-connection
+
+variables:
+  acrLoginServer: ecommerceacr2804.azurecr.io
+  imageTag: $(Build.BuildId)
+  acrServiceConnection: acr-service-connection
+
+stages:
+  - stage: Build_Scan_Push
+    displayName: Build, Scan and Push
+    jobs:
+      - job: BuildAndPush
+        displayName: Build and scan application
+        steps:
+          - checkout: self
+
+          # Build and test all four Spring Boot modules
+          - template: templates/build/maven-build.yml@templates
+            parameters:
+              mavenPomFile: pom.xml
+              goals: clean verify
+
+          # Build and lint React frontend
+          - template: templates/build/node-build.yml@templates
+            parameters:
+              workingDirectory: frontend
+              nodeVersion: '22.x'
+              buildCommand: npm run build
+
+          # Login to Azure Container Registry
+          - task: Docker@2
+            displayName: Login to ACR
+            inputs:
+              command: login
+              containerRegistry: $(acrServiceConnection)
+
+          # Build all five Docker images
+          - script: |
+              set -e
+
+              docker build \
+                -f docker/springboot.Dockerfile \
+                --build-arg SERVICE_DIR=services/user-service \
+                --build-arg SERVICE_PORT=8081 \
+                -t $(acrLoginServer)/ecommerce-user-service:$(imageTag) .
+
+              docker build \
+                -f docker/springboot.Dockerfile \
+                --build-arg SERVICE_DIR=services/product-service \
+                --build-arg SERVICE_PORT=8082 \
+                -t $(acrLoginServer)/ecommerce-product-service:$(imageTag) .
+
+              docker build \
+                -f docker/springboot.Dockerfile \
+                --build-arg SERVICE_DIR=services/order-service \
+                --build-arg SERVICE_PORT=8083 \
+                -t $(acrLoginServer)/ecommerce-order-service:$(imageTag) .
+
+              docker build \
+                -f docker/springboot.Dockerfile \
+                --build-arg SERVICE_DIR=services/payment-service \
+                --build-arg SERVICE_PORT=8084 \
+                -t $(acrLoginServer)/ecommerce-payment-service:$(imageTag) .
+
+              docker build \
+                -f frontend/Dockerfile \
+                -t $(acrLoginServer)/ecommerce-frontend:$(imageTag) \
+                frontend
+            displayName: Build Docker images
+
+          # Install Trivy
+          - script: |
+              sudo apt-get update
+              sudo apt-get install -y wget
+              wget -qO- https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+                | sudo sh -s -- -b /usr/local/bin
+              trivy --version
+            displayName: Install Trivy
+
+          # Scan all images. Any HIGH or CRITICAL finding fails the pipeline.
+          - script: |
+              set -e
+
+              images=(
+                ecommerce-user-service
+                ecommerce-product-service
+                ecommerce-order-service
+                ecommerce-payment-service
+                ecommerce-frontend
+              )
+
+              for image in "${images[@]}"; do
+                echo "Scanning $image"
+                trivy image \
+                  --severity HIGH,CRITICAL \
+                  --exit-code 1 \
+                  --ignore-unfixed \
+                  "$(acrLoginServer)/${image}:$(imageTag)"
+              done
+            displayName: Scan Docker images with Trivy
+
+          # Push only after all image scans pass
+          - script: |
+              set -e
+
+              for image in \
+                ecommerce-user-service \
+                ecommerce-product-service \
+                ecommerce-order-service \
+                ecommerce-payment-service \
+                ecommerce-frontend
+              do
+                docker push "$(acrLoginServer)/${image}:$(imageTag)"
+              done
+            displayName: Push images to ACR
+
+  - stage: Update_GitOps
+    displayName: Update GitOps repository
+    dependsOn: Build_Scan_Push
+    condition: succeeded()
+    jobs:
+      - job: UpdateManifests
+        displayName: Update Kubernetes image tags
+        steps:
+          - checkout: none
+
+          - script: |
+              set -e
+              set +x
+
+              git clone \
+                "https://github.com/gaikwadritesh2804/ecommerce-gitops.git" \
+                gitops
+
+              cd gitops
+
+              for environment in dev stage prod; do
+                for image in \
+                  ecommerce-user-service \
+                  ecommerce-product-service \
+                  ecommerce-order-service \
+                  ecommerce-payment-service \
+                  ecommerce-frontend
+                do
+                  sed -i \
+                    "s|newTag:.*|newTag: \"$(imageTag)\"|" \
+                    "apps/ecommerce/overlays/${environment}/kustomization.yaml"
+                done
+              done
+
+              git config user.name "Azure DevOps"
+              git config user.email "azure-devops@users.noreply.github.com"
+
+              git add apps/ecommerce/overlays
+              git commit -m "Update ecommerce images to build $(imageTag)"
+
+              git -c http.extraheader="AUTHORIZATION: basic $(printf ':%s' "$GITHUB_TOKEN" | base64 -w 0)" \
+                push origin main
+            displayName: Update and push GitOps manifests
+            env:
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
